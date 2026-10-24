@@ -4,6 +4,11 @@ from gymnasium import spaces
 from game import Game2048
 
 
+def encode_board(board):
+    """Flatten log2 tiles, with zero for empty cells."""
+    return np.log2(np.maximum(board, 1)).astype(np.float32).ravel()
+
+
 class Game2048Env(gym.Env):
     metadata = {"render_modes": ["human"]}
 
@@ -16,11 +21,7 @@ class Game2048Env(gym.Env):
         self.observation_space = spaces.Box(low=0, high=31, shape=(16,), dtype=np.float32)
 
     def get_observation(self):
-        board = self.game.get_board()
-        observation = np.zeros_like(board, dtype=np.float32)
-        nonzero_cells = board > 0
-        observation[nonzero_cells] = np.log2(board[nonzero_cells])
-        return observation.flatten()
+        return encode_board(self.game.board)
 
     def get_info(self):
         return {

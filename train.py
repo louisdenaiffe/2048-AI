@@ -40,7 +40,7 @@ def main():
                 learning_rate=0.0001, # Conservative learning rate, to avoid unstability in training.
                 buffer_size=100_000, # Keeps many varied experiences in the replay buffer, without using excessive memory.
                 learning_starts=10_000, # Collect 10k experiences before starting to train the mode, ensures that it doesnt start learning from a small, random number of experiences.
-                batch_size=128, # Provides relatively stabke updates, while remaining computationally efficient.
+                batch_size=128, # Provides relatively stable updates, while remaining computationally efficient.
                 gamma=0.99, # Values long-term rewards strongly, because good early moves can enable much better tiles later.
                 train_freq=4, # Trains once every four environment moves. This reduces computation and prevents excessive learning from very similar consecutive experiences.
                 gradient_steps=1, # Performs one neural-network update whenever training occurs—a stable, efficient baseline.

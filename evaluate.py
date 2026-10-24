@@ -3,17 +3,23 @@ from stable_baselines3 import DQN
 from environment import Game2048Env
 
 
+# This is for benchmarking models and seeing how they compare to each other.
+
+
 def play_games(model, number_of_games=100):
-    env = Game2048Env()
+    env = Game2048Env()  # Creates a Game2048Env instance 
     scores = []
     largest_tiles = []
-    for game_number in range(number_of_games):
-        observation, info = env.reset(seed=game_number)
+    for game_number in range(number_of_games):  # we iterate through each game
+        observation, info = env.reset(seed=game_number)  # starts a new game, and returns the game board + info about game stats, like the score, the largest tile...
         finished = False
         while not finished:
-            action, _ = model.predict(observation, deterministic=True)
-            observation, reward, terminated, truncated, info = env.step(action)
-            finished = terminated or truncated
+            action, _ = model.predict(observation, deterministic=True) 
+            # Given this board (observation) what move should I choose?
+            # action is 0 (up), 1(down), 2(left) or 3(right)
+            observation, reward, terminated, truncated, info = env.step(action)  # this runs one timestep of the env's dynamics using the agent's chosen action.
+            # Returns the board AFTER the move, points earned from merging (0 or -2), terminated (no moves remain), truncated (move limit reached), and updated stats
+            finished = terminated or truncated # checks if the env is finished, if so ends the loop.
         scores.append(info["score"])
         largest_tiles.append(info["largest_tile"])
     env.close()

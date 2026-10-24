@@ -1,24 +1,22 @@
 import numpy as np
-import tkinter as tk
-from tkinter import messagebox
+
+
+# Class with all the basic functions to make the game work: reset(), add_random_tile(), merge_line(), 
+# preview_move(), apply_move(), get_valid_actions(), is_game_over(), get_board()
 
 
 class Game2048:
-    ACTION_UP = 0
-    ACTION_DOWN = 1
-    ACTION_LEFT = 2
-    ACTION_RIGHT = 3
+    ACTION_UP, ACTION_DOWN, ACTION_LEFT, ACTION_RIGHT = range(4)
+    ACTION_NAMES = ("Up", "Down", "Left", "Right")
 
     def __init__(self, seed=None):
         self.rng = np.random.default_rng(seed)
         self.board = np.zeros((4, 4), dtype=np.int32)
-        self.score = 0
         self.reset()
 
     def reset(self, seed=None):
         if seed is not None:
             self.rng = np.random.default_rng(seed)
-
         self.board.fill(0)
         self.score = 0
         self.add_random_tile()
@@ -26,167 +24,62 @@ class Game2048:
         return self.get_board()
 
     def add_random_tile(self):
-        empty_spaces = np.argwhere(self.board == 0)
-
-        if len(empty_spaces) == 0:
+        empty = np.flatnonzero(self.board == 0)
+        if not empty.size:
             return False
-
-        position = self.rng.integers(len(empty_spaces))
-        row, column = empty_spaces[position]
-        self.board[row, column] = 4 if self.rng.random() < 0.1 else 2
+        position = empty[self.rng.integers(empty.size)]
+        self.board.flat[position] = 4 if self.rng.random() < 0.1 else 2
         return True
 
     @staticmethod
     def merge_line(line):
-        numbers = line[line != 0].tolist()
-        merged_numbers = []
-        points_gained = 0
-        index = 0
+        """Slide left, merging each tile at most once."""
+        tiles = line[line != 0].tolist()
+        merged, points, i = [], 0, 0
+        while i < len(tiles):
+            value = tiles[i]
+            if i + 1 < len(tiles) and value == tiles[i + 1]:
+                value *= 2
+                points += value
+                i += 1
+            merged.append(value)
+            i += 1
+        return np.array(merged + [0] * (4 - len(merged)), dtype=np.int32), points
 
-        while index < len(numbers):
-            if (
-                index + 1 < len(numbers)
-                and numbers[index] == numbers[index + 1]
-            ):
-                new_value = numbers[index] * 2
-                merged_numbers.append(new_value)
-                points_gained += new_value
-                index += 2
-            else:
-                merged_numbers.append(numbers[index])
-                index += 1
-
-        merged_numbers += [0] * (4 - len(merged_numbers))
-
-        return (
-            np.array(merged_numbers, dtype=np.int32),
-            points_gained,
-        )
-
-    def move_left(self):
-        old_board = self.board.copy()
-        points_gained = 0
-
-        for row in range(4):
-            merged, points = self.merge_line(self.board[row])
-            self.board[row] = merged
-            points_gained += points
-
-        return self.finish_move(old_board, points_gained)
-
-    def move_right(self):
-        old_board = self.board.copy()
-        points_gained = 0
-
-        for row in range(4):
-            reversed_row = self.board[row][::-1]
-            merged, points = self.merge_line(reversed_row)
-            self.board[row] = merged[::-1]
-            points_gained += points
-
-        return self.finish_move(old_board, points_gained)
-
-    def move_up(self):
-        old_board = self.board.copy()
-        points_gained = 0
-
-        for column in range(4):
-            merged, points = self.merge_line(self.board[:, column])
-            self.board[:, column] = merged
-            points_gained += points
-
-        return self.finish_move(old_board, points_gained)
-
-    def move_down(self):
-        old_board = self.board.copy()
-        points_gained = 0
-
-        for column in range(4):
-            reversed_column = self.board[:, column][::-1]
-            merged, points = self.merge_line(reversed_column)
-            self.board[:, column] = merged[::-1]
-            points_gained += points
-
-        return self.finish_move(old_board, points_gained)
-
-    def finish_move(self, old_board, points_gained):
-        changed = not np.array_equal(self.board, old_board)
-
-        if changed:
-            self.score += points_gained
-            self.add_random_tile()
-
-        return points_gained, changed
+    def preview_move(self, action):
+        """Return (board, points, changed) without mutating state or RNG."""
+        if action not in range(4):
+            raise ValueError("Action must be 0, 1, 2, or 3")
+        board = self.board.copy()
+        # Orient the board so every action becomes a left merge. These are
+        # writable views: updating a row also updates the copied board.
+        rows = board.T if action in (self.ACTION_UP, self.ACTION_DOWN) else board
+        if action in (self.ACTION_DOWN, self.ACTION_RIGHT):
+            rows = rows[:, ::-1]
+        points = 0
+        for row in rows:
+            merged, gained = self.merge_line(row)
+            row[:] = merged
+            points += gained
+        return board, points, not np.array_equal(board, self.board)
 
     def apply_move(self, action):
-        moves = {
-            self.ACTION_UP: self.move_up,
-            self.ACTION_DOWN: self.move_down,
-            self.ACTION_LEFT: self.move_left,
-            self.ACTION_RIGHT: self.move_right,
-        }
-
-        if action not in moves:
-            raise ValueError("Action must be 0, 1, 2, or 3")
-
-        return moves[action]()
+        board, points, changed = self.preview_move(action)
+        if changed:
+            self.board[:] = board
+            self.score += points
+            self.add_random_tile()
+        return points, changed
 
     def get_valid_actions(self):
-        """Return actions that would change the board."""
-        valid_actions = []
-        original_board = self.board.copy()
-
-        for action in range(4):
-            test_game = Game2048.__new__(Game2048)
-            test_game.board = original_board.copy()
-            test_game.score = 0
-            test_game.rng = np.random.default_rng()
-
-            # Do not call finish_move here: checking whether a move is valid
-            # should never add a random tile or otherwise mutate game state.
-            points_gained = 0
-            if action in (self.ACTION_LEFT, self.ACTION_RIGHT):
-                for row in range(4):
-                    line = test_game.board[row]
-                    if action == self.ACTION_RIGHT:
-                        line = line[::-1]
-                    merged, points = self.merge_line(line)
-                    test_game.board[row] = (
-                        merged[::-1]
-                        if action == self.ACTION_RIGHT
-                        else merged
-                    )
-                    points_gained += points
-            else:
-                for column in range(4):
-                    line = test_game.board[:, column]
-                    if action == self.ACTION_DOWN:
-                        line = line[::-1]
-                    merged, points = self.merge_line(line)
-                    test_game.board[:, column] = (
-                        merged[::-1]
-                        if action == self.ACTION_DOWN
-                        else merged
-                    )
-
-            changed = not np.array_equal(test_game.board, original_board)
-
-            if changed:
-                valid_actions.append(action)
-
-        return valid_actions
+        return [action for action in range(4) if self.preview_move(action)[2]]
 
     def is_game_over(self):
-        if np.any(self.board == 0):
-            return False
-
-        if np.any(self.board[:, :-1] == self.board[:, 1:]):
-            return False
-
-        if np.any(self.board[:-1, :] == self.board[1:, :]):
-            return False
-
-        return True
+        return not (
+            np.any(self.board == 0)
+            or np.any(self.board[:, :-1] == self.board[:, 1:])
+            or np.any(self.board[:-1, :] == self.board[1:, :])
+        )
 
     def get_board(self):
         return self.board.copy()
@@ -222,6 +115,8 @@ class Game2048GUI:
     }
 
     def __init__(self, root, game):
+        import tkinter as tk
+
         self.root = root
         self.game = game
         self.cells = []
@@ -345,6 +240,8 @@ class Game2048GUI:
             self.move_in_progress = False
 
     def show_game_over(self):
+        from tkinter import messagebox
+
         if self.game.is_game_over() and not self.game_over_displayed:
             self.game_over_displayed = True
             messagebox.showinfo(
@@ -416,16 +313,9 @@ class Game2048GUI:
 
 
 if __name__ == "__main__":
+    import tkinter as tk
+
     root = tk.Tk()
     game = Game2048(seed=42)
     gui = Game2048GUI(root, game)
-
-    # To display an ML agent, uncomment these lines:
-    #
-    # def choose_action(board):
-    #     valid_actions = game.get_valid_actions()
-    #     return int(game.rng.choice(valid_actions))
-    #
-    # gui.run_agent(choose_action, delay=150)
-
     root.mainloop()
