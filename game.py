@@ -85,6 +85,9 @@ class Game2048:
         return self.board.copy()
 
 
+# Class for rendering the game visually. 
+# Function include: make_move(), show_game_over(), update_display(), reset(), stop_agent(), run_agent() (and step_agent() inside)
+
 class Game2048GUI:
     CELL_SIZE = 100
 
@@ -101,17 +104,6 @@ class Game2048GUI:
         512: ("#edc850", "#f9f6f2"),
         1024: ("#edc53f", "#f9f6f2"),
         2048: ("#edc22e", "#f9f6f2"),
-    }
-
-    KEY_ACTIONS = {
-        "up": Game2048.ACTION_UP,
-        "down": Game2048.ACTION_DOWN,
-        "left": Game2048.ACTION_LEFT,
-        "right": Game2048.ACTION_RIGHT,
-        "w": Game2048.ACTION_UP,
-        "s": Game2048.ACTION_DOWN,
-        "a": Game2048.ACTION_LEFT,
-        "d": Game2048.ACTION_RIGHT,
     }
 
     def __init__(self, root, game):
@@ -188,14 +180,6 @@ class Game2048GUI:
 
             self.cells.append(cell_row)
 
-        tk.Label(
-            root,
-            text="Arrow keys or WASD to move",
-            font=("Helvetica", 12),
-            bg="#faf8ef",
-            fg="#776e65",
-        ).pack(pady=5)
-
         tk.Button(
             root,
             text="New Game",
@@ -210,22 +194,10 @@ class Game2048GUI:
             pady=8,
         ).pack(pady=10)
 
-        # bind_all keeps controls working even after the New Game button has
-        # taken keyboard focus. Normalizing keysyms also supports uppercase
-        # WASD (Caps Lock/Shift) consistently across platforms.
-        self.root.bind_all("<KeyPress>", self.handle_key)
-        self.root.focus_set()
         self.update_display()
 
-    def handle_key(self, event):
-        key = event.keysym.lower()
-
-        if key in self.KEY_ACTIONS:
-            self.make_move(self.KEY_ACTIONS[key])
-            return "break"
-
     def make_move(self, action):
-        # Ignore queued key-repeat events while a move/dialog is being handled.
+        # Prevent re-entrant moves while a move/dialog is being handled.
         if self.move_in_progress or self.game.is_game_over():
             self.show_game_over()
             return 0, False

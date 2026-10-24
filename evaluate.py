@@ -3,7 +3,7 @@ from stable_baselines3 import DQN
 from environment import Game2048Env
 
 
-# This is for benchmarking models and seeing how they compare to each other.
+# This is for evaluating models and seeing how they compare to each other.
 
 
 def play_games(model, number_of_games=100):
@@ -19,15 +19,19 @@ def play_games(model, number_of_games=100):
             # action is 0 (up), 1(down), 2(left) or 3(right)
             observation, reward, terminated, truncated, info = env.step(action)  # this runs one timestep of the env's dynamics using the agent's chosen action.
             # Returns the board AFTER the move, points earned from merging (0 or -2), terminated (no moves remain), truncated (move limit reached), and updated stats
+            # These are actually all defined in environment.py, so check that out.
             finished = terminated or truncated # checks if the env is finished, if so ends the loop.
-        scores.append(info["score"])
-        largest_tiles.append(info["largest_tile"])
+        scores.append(info["score"]) # appends the score for that game (also called episode) to a score list
+        largest_tiles.append(info["largest_tile"]) # same with the largest tile
+        # So now we have the score and the largest tile from each game
     env.close()
     return scores, largest_tiles
 
 
 model = DQN.load("dqn_2048")
-scores, largest_tiles = play_games(model)
+scores, largest_tiles = play_games(model) # calls the function and passes on the scores and largest_tiles lists
+
+# Benchmarking: mean, median, max, mean of the largest tiles, best tile.
 
 print("Games:", len(scores))
 print("Mean score:", np.mean(scores))
