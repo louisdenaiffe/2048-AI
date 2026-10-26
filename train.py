@@ -12,10 +12,12 @@ def main():
     parser.add_argument("--steps", type=int, default=200_000) # Adds a command-line argument --steps to the parser, which specifies the number of training steps for the model. The default value is set to 200,000.
     parser.add_argument("--model", default="dqn_2048") # Adds a command-line argument --model to the parser, which specifies the name of the model file to save or load. The default value is set to "dqn_2048".
     parser.add_argument("--continue-training", action="store_true", help="Continue training an existing model") # Adds a command-line argument --continue-training to the parser, which is a boolean flag. If this flag is provided, it indicates that the user wants to continue training an existing model instead of creating a new one.
+    parser.add_argument("--seed", type=int, default=None, help="Random seed for a new training run")
     args = parser.parse_args() # Parses the command-line arguments and assigns the parsed values to the variable args. This allows access to the values of the --steps, --model, and --continue-training arguments.
 
     env = Monitor(Game2048Env()) # Creates an instance of the Game2048Env environment and wraps it with the Monitor class. The Monitor class is used to record training statistics, such as episode rewards and lengths, during the training process.
-    model_path = Path(f"{args.model}.zip") # Model path
+    model_path = Path(args.model if args.model.endswith(".zip") else f"{args.model}.zip") # Model path
+    replay_path = model_path.with_suffix(".replay.pkl") # The model's saved experiences
 
     try:
         if args.continue_training: # This will run if the --continue_training flag is provided when executing the script. 
@@ -29,6 +31,12 @@ def main():
                 env=env,
                 device="auto",
             )
+            if replay_path.exists():
+                model.load_replay_buffer(replay_path)
+            else:
+                # Older model files cannot recover experiences that were never saved.
+                print("No replay buffer found; collecting 10,000 fresh moves before learning updates.")
+                model.learning_starts = model.num_timesteps + 10_000
             reset_timesteps = False
 
         else: # this will run if the --continue_training flag is not provided when executing the script.
@@ -47,6 +55,7 @@ def main():
                 exploration_fraction=0.3, # Gradually transitions from random exploration to learned behavior during the first 30% of training.
                 exploration_initial_eps=1.0, # Starts completely random so the replay buffer receives varied experiences.
                 exploration_final_eps=0.05, # Keeps 5% randomness, allowing occasional discovery of new situations instead of permanently following one strategy.
+                seed=args.seed, # Different seeds give independent training runs; used for new models only.
                 verbose=1,
                 device="auto", # Automatically uses GPU if available, otherwise defaults to CPU
             )
@@ -58,8 +67,10 @@ def main():
             progress_bar=True,
         )
 
-        model.save(args.model)
+        model.save(model_path)
+        model.save_replay_buffer(replay_path)
         print(f"Saved model to {model_path}")
+        print(f"Saved replay buffer to {replay_path}")
 
     finally:
         env.close()

@@ -52,11 +52,13 @@ class Game2048Env(gym.Env): # Defines the env by inheriting from the Gym's base 
         self.moves += 1
         reward = float(points_gained) 
         # reward is set to points gained, which means the more points the AI gets, the more it is rewarded, encouraging it to get more points.
+        blocked_move = False
         if not changed: # if the preview of that move reveals that the board hasn'tchanged, then reward is -2.
             reward -= 2.0
+            blocked_move = True
         terminated = self.game.is_game_over() # checks if the game is over (grid covered in tiles, no more moves possible)
         truncated = self.moves >= self.max_moves # if moves is more than 10k, then termination of the env
-        return self.get_observation(), reward, terminated, truncated, self.get_info()
+        return self.get_observation(), reward, terminated, truncated, blocked_move, self.get_info()
 
     def render(self):
         print(self.game.board)
