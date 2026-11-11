@@ -13,6 +13,23 @@ def encode_board(board):
     # .ravel() flattens the 4x4 grid into an array, reading row by row.
 
 
+def choose_masked_action(model, observation, valid_actions):
+    # Like model.predict(observation, deterministic=True), but only among the valid (non-blocked) moves.
+    import torch
+
+    observation_tensor, _ = model.policy.obs_to_tensor(observation)
+    # Converts the numpy observation into a PyTorch tensor, with the shape and device (CPU/GPU) the network expects.
+    with torch.no_grad(): # we're only using the network, not training it, so no need to track gradients
+        q_values = model.q_net(observation_tensor)[0].cpu().numpy()
+    # q_net outputs one Q-value per action: the network's estimate of how good each move is.
+    # [0] takes the first (and only) board of the batch, .cpu().numpy() turns it back into a normal numpy array.
+
+    if not valid_actions: # no valid move means the game is over, so the choice doesn't matter
+        return int(np.argmax(q_values))
+    return max(valid_actions, key=lambda action: q_values[action])
+    # Among the valid actions, returns the one with the highest Q-value.
+
+
 class Game2048Env(gym.Env): # Defines the env by inheriting from the Gym's base env class, gym.Env
     metadata = {"render_modes": ["human"]} # Declares that the env supports rendering for a human to watch. (doesn't create a GUI tho)
 

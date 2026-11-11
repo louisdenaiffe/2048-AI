@@ -1,7 +1,7 @@
 import numpy as np
 import argparse
 from stable_baselines3 import DQN
-from environment import Game2048Env
+from environment import Game2048Env, choose_masked_action
 
 
 # This is for evaluating models and seeing how they compare to each other.
@@ -19,8 +19,8 @@ def play_games(model, number_of_games=100):
         observation, info = env.reset(seed=game_number)  # starts a new game, and returns the game board + info about game stats, like the score, the largest tile...
         finished = False
         while not finished:
-            action, _ = model.predict(observation, deterministic=True)
-            # Given this board (observation) what move should I choose?
+            action = choose_masked_action(model, observation, env.game.get_valid_actions())
+            # Given this board (observation) what move should I choose? Only valid moves are considered, so the agent can't get stuck.
             # action is 0 (up), 1(down), 2(left) or 3(right)
             observation, reward, terminated, truncated, info = env.step(action)  # this runs one timestep of the env's dynamics using the agent's chosen action.
             # Returns the board AFTER the move, points earned from merging (0 or -2), terminated (no moves remain), truncated (move limit reached), and updated stats

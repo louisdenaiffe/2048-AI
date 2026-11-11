@@ -29,18 +29,22 @@ class Game2048:
 
     def add_random_tile(self):
         empty = np.flatnonzero(self.board == 0)
-        
-        if not empty.size:
+        # self.board == 0 builds a 4x4 grid of True and Falses, with True where a cell is empty.
+        # Then np.flatnonzero() returns the indices of these empty cells, as if the board were a row of 16 cells.
+        if not empty.size: # if there are no empty cells, then return False, because there is no space.
             return False
         position = empty[self.rng.integers(empty.size)]
+        # self.rng.integers(n) chooses a random whole number between 0 and n-1. that number is an indice of an indice of an empty cell. (not a typo)
+        # as such, position takes the indice of an empty cell in the board.
         self.board.flat[position] = 4 if self.rng.random() < 0.1 else 2
+        # In 90% of cases, that empty cell becomes a 2, and in 10% of cases, it becomes a 4.
         return True
 
     @staticmethod
-    def merge_line(line):
-        """Slide left, merging each tile at most once."""
-        tiles = line[line != 0].tolist()
+    def merge_line(line): # careful, input here is not the board but an individual row
+        tiles = line[line != 0].tolist() # transforms it into a list, without the null elements. (so np.array([3, 0, 3, 4]) -> [3, 3, 4])
         merged, points, i = [], 0, 0
+        # The whole merging math, boring
         while i < len(tiles):
             value = tiles[i]
             if i + 1 < len(tiles) and value == tiles[i + 1]:
@@ -50,23 +54,26 @@ class Game2048:
             merged.append(value)
             i += 1
         return np.array(merged + [0] * (4 - len(merged)), dtype=np.int32), points
+        # returns the row, merged, as well as the points gained from merging.
+        # IMPORTANT: why only left? what if the agent decided on right, up or down? W
+        # ell, preview_move() flips the board horizontally and vertically! thats it
 
     def preview_move(self, action):
-        """Return (board, points, changed) without mutating state or RNG."""
         if action not in range(4):
             raise ValueError("Action must be 0, 1, 2, or 3")
-        board = self.board.copy()
-        # Orient the board so every action becomes a left merge. These are
-        # writable views: updating a row also updates the copied board.
+        board = self.board.copy() # we copy the board so as to not change it yet (this is a preview)
         rows = board.T if action in (self.ACTION_UP, self.ACTION_DOWN) else board
+        # Orients the board so every action becomes a left merge (board.T is the transpose of the board)
+        # These are writable views: updating a row also updates the copied board.
         if action in (self.ACTION_DOWN, self.ACTION_RIGHT):
             rows = rows[:, ::-1]
         points = 0
         for row in rows:
-            merged, gained = self.merge_line(row)
+            merged, gained = self.merge_line(row) # merges each row individually
             row[:] = merged
             points += gained
         return board, points, not np.array_equal(board, self.board)
+        # returns what the board looks like after that previewed move, the points this move would earn, and whether the board has changed.
 
     def apply_move(self, action):
         board, points, changed = self.preview_move(action)
@@ -74,6 +81,8 @@ class Game2048:
             self.board[:] = board
             self.score += points
             self.add_random_tile()
+        # If the board has changed after previewing the move, then apply that move.
+        # Then add another random tile to the board.
         return points, changed
 
     def get_valid_actions(self):
