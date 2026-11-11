@@ -12,19 +12,24 @@ class Game2048:
     def __init__(self, seed=None):
         self.rng = np.random.default_rng(seed)
         self.board = np.zeros((4, 4), dtype=np.int32)
+        # Creates a new null matrix with 4 rows and 4 columns
         self.reset()
 
     def reset(self, seed=None):
         if seed is not None:
             self.rng = np.random.default_rng(seed)
-        self.board.fill(0)
+        # If there is a seed, then generate a new random number generator (rng) using that seed.
+        # Later on, this rng can be used to create random numbers, deterministically, so different models can be tested on identical games.
+        self.board.fill(0) # Clears the existing matrix (board)
         self.score = 0
         self.add_random_tile()
         self.add_random_tile()
-        return self.get_board()
+        # Sets score to 0 and adds the two initial tiles to the cleared board.
+        return self.get_board() # returns a copy of the board
 
     def add_random_tile(self):
         empty = np.flatnonzero(self.board == 0)
+        
         if not empty.size:
             return False
         position = empty[self.rng.integers(empty.size)]

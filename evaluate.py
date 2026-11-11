@@ -1,4 +1,5 @@
 import numpy as np
+import argparse
 from stable_baselines3 import DQN
 from environment import Game2048Env
 
@@ -12,19 +13,19 @@ def play_games(model, number_of_games=100):
     largest_tiles = []
     games_truncated = 0
     games_terminated = 0
-    blocked_moves = 0
     total_blocked_moves = []
     for game_number in range(number_of_games):  # we iterate through each game
+        blocked_moves = 0
         observation, info = env.reset(seed=game_number)  # starts a new game, and returns the game board + info about game stats, like the score, the largest tile...
         finished = False
         while not finished:
-            action, _ = model.predict(observation, deterministic=True) 
+            action, _ = model.predict(observation, deterministic=True)
             # Given this board (observation) what move should I choose?
             # action is 0 (up), 1(down), 2(left) or 3(right)
-            observation, reward, terminated, truncated, blocked_move, info = env.step(action)  # this runs one timestep of the env's dynamics using the agent's chosen action.
+            observation, reward, terminated, truncated, info = env.step(action)  # this runs one timestep of the env's dynamics using the agent's chosen action.
             # Returns the board AFTER the move, points earned from merging (0 or -2), terminated (no moves remain), truncated (move limit reached), and updated stats
             # These are actually all defined in environment.py, so check that out.
-            if blocked_move: blocked_moves += 1
+            if info["blocked_move"]: blocked_moves += 1
             finished = terminated or truncated # checks if the env is finished, if so ends the loop.
         scores.append(info["score"]) # appends the score for that game (also called episode) to a score list
         largest_tiles.append(info["largest_tile"]) # same with the largest tile
@@ -35,8 +36,11 @@ def play_games(model, number_of_games=100):
     env.close()
     return scores, largest_tiles, games_terminated, games_truncated, total_blocked_moves
 
+parser = argparse.ArgumentParser()
+parser.add_argument("--model", default="dqn_2048")
+args = parser.parse_args()
 
-model = DQN.load("dqn_2048")
+model = DQN.load(args.model)
 scores, largest_tiles, games_terminated, games_truncated, total_blocked_moves= play_games(model) 
 # calls the function and passes on the scores and largest_tiles lists
 

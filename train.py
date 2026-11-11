@@ -9,9 +9,12 @@ from environment import Game2048Env
 
 def main():
     parser = argparse.ArgumentParser()  # Creates an instance of the ArgumentParser class and assigns it to the variable parser.
-    parser.add_argument("--steps", type=int, default=200_000) # Adds a command-line argument --steps to the parser, which specifies the number of training steps for the model. The default value is set to 200,000.
-    parser.add_argument("--model", default="dqn_2048") # Adds a command-line argument --model to the parser, which specifies the name of the model file to save or load. The default value is set to "dqn_2048".
-    parser.add_argument("--continue-training", action="store_true", help="Continue training an existing model") # Adds a command-line argument --continue-training to the parser, which is a boolean flag. If this flag is provided, it indicates that the user wants to continue training an existing model instead of creating a new one.
+    parser.add_argument("--steps", type=int, default=200_000) 
+    # Adds a command-line argument --steps to the parser, which specifies the number of training steps for the model. The default value is set to 200,000.
+    parser.add_argument("--model", default="dqn_2048") 
+    # Adds a command-line argument --model to the parser, which specifies the name of the model file to save or load. The default value is set to "dqn_2048".
+    parser.add_argument("--continue-training", action="store_true", help="Continue training an existing model") 
+    # Adds a command-line argument --continue-training to the parser, which is a boolean flag. If this flag is provided, it indicates that the user wants to continue training an existing model instead of creating a new one.
     parser.add_argument("--seed", type=int, default=None, help="Random seed for a new training run")
     args = parser.parse_args() # Parses the command-line arguments and assigns the parsed values to the variable args. This allows access to the values of the --steps, --model, and --continue-training arguments.
 

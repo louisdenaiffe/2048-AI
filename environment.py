@@ -58,7 +58,9 @@ class Game2048Env(gym.Env): # Defines the env by inheriting from the Gym's base 
             blocked_move = True
         terminated = self.game.is_game_over() # checks if the game is over (grid covered in tiles, no more moves possible)
         truncated = self.moves >= self.max_moves # if moves is more than 10k, then termination of the env
-        return self.get_observation(), reward, terminated, truncated, blocked_move, self.get_info()
+        info = self.get_info()
+        info["blocked_move"] = blocked_move
+        return self.get_observation(), reward, terminated, truncated, info
 
     def render(self):
         print(self.game.board)
