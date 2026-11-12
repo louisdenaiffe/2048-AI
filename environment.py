@@ -13,23 +13,6 @@ def encode_board(board):
     # .ravel() flattens the 4x4 grid into an array, reading row by row.
 
 
-def choose_masked_action(model, observation, valid_actions):
-    # Like model.predict(observation, deterministic=True), but only among the valid (non-blocked) moves.
-    import torch
-
-    observation_tensor, _ = model.policy.obs_to_tensor(observation)
-    # Converts the numpy observation into a PyTorch tensor, with the shape and device (CPU/GPU) the network expects.
-    with torch.no_grad(): # we're only using the network, not training it, so no need to track gradients
-        q_values = model.q_net(observation_tensor)[0].cpu().numpy()
-    # q_net outputs one Q-value per action: the network's estimate of how good each move is.
-    # [0] takes the first (and only) board of the batch, .cpu().numpy() turns it back into a normal numpy array.
-
-    if not valid_actions: # no valid move means the game is over, so the choice doesn't matter
-        return int(np.argmax(q_values))
-    return max(valid_actions, key=lambda action: q_values[action])
-    # Among the valid actions, returns the one with the highest Q-value.
-
-
 class Game2048Env(gym.Env): # Defines the env by inheriting from the Gym's base env class, gym.Env
     metadata = {"render_modes": ["human"]} # Declares that the env supports rendering for a human to watch. (doesn't create a GUI tho)
 
@@ -63,20 +46,17 @@ class Game2048Env(gym.Env): # Defines the env by inheriting from the Gym's base 
         return self.get_observation(), self.get_info() # useful for evaluation
 
     def step(self, action): # runs one timestep of the env, one action.
-        points_gained, changed = self.game.apply_move(int(action)) # This is what the game apply_move() function returns based on the action
-        # apply_move() runs preview_move(), which simulates the move without changing the board. 
-        # If it sees that it will change the board, it applies that move and outputs changed=True.
+        points_gained, _ = self.game.apply_move(int(action)) # This is what the game apply_move() function returns based on the action
+        # apply_move() runs preview_move(), which simulates the move without changing the board.
+        # If it sees that it will change the board, it applies that move. (The second value it returns, "changed", isn't needed here:
+        # MaskedDQN never chooses a blocked move, and even if one arrived, apply_move() would simply do nothing.)
         self.moves += 1
-        reward = float(points_gained) 
+        reward = float(points_gained)
         # reward is set to points gained, which means the more points the AI gets, the more it is rewarded, encouraging it to get more points.
-        blocked_move = False
-        if not changed: # if the preview of that move reveals that the board hasn'tchanged, then reward is -2.
-            reward -= 2.0
-            blocked_move = True
         terminated = self.game.is_game_over() # checks if the game is over (grid covered in tiles, no more moves possible)
         truncated = self.moves >= self.max_moves # if moves is more than 10k, then termination of the env
+        # Safety net only: with masking, every move changes the board and games always end naturally.
         info = self.get_info()
-        info["blocked_move"] = blocked_move
         return self.get_observation(), reward, terminated, truncated, info
 
     def render(self):

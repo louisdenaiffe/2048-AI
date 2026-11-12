@@ -1,10 +1,10 @@
 import argparse
 from pathlib import Path
 
-from stable_baselines3 import DQN
 from stable_baselines3.common.monitor import Monitor
 
 from environment import Game2048Env
+from masked_dqn import MaskedDQN # DQN with action masking (see masked_dqn.py)
 
 
 def main():
@@ -29,7 +29,7 @@ def main():
 
             print(f"Continuing {model_path} for {args.steps:,} steps")
 
-            model = DQN.load(
+            model = MaskedDQN.load(
                 args.model,
                 env=env,
                 device="auto",
@@ -45,7 +45,7 @@ def main():
         else: # this will run if the --continue_training flag is not provided when executing the script.
             print(f"Creating a new model for {args.steps:,} steps")
 
-            model = DQN(
+            model = MaskedDQN(
                 policy="MlpPolicy", # The board has 16 numbers, so the input layer of the MLP policy will have 16 neurons. The output layer will have 4 neurons, corresponding to the 4 possible actions (up, down, left, right) in the game.
                 env=env,
                 learning_rate=0.0001, # Conservative learning rate, to avoid unstability in training.
