@@ -28,8 +28,10 @@ class Game2048Env(gym.Env): # Defines the env by inheriting from the Gym's base 
         # low=0, high=31 means each encoded value must be between 0 and 31
         # dtype=np,float32 each value is a 32-bit floating-point number
 
+
     def get_observation(self):
         return encode_board(self.game.board)
+
 
     def get_info(self):
         return {
@@ -38,6 +40,7 @@ class Game2048Env(gym.Env): # Defines the env by inheriting from the Gym's base 
             "moves": self.moves
         }
 
+
     def reset(self, seed=None, options=None):
         super().reset(seed=seed) # super() refers to the parent class's (Gym.env) functions/methods
         # Resets the Gymnasium environment with some randomness directed by the seed.
@@ -45,19 +48,21 @@ class Game2048Env(gym.Env): # Defines the env by inheriting from the Gym's base 
         self.moves = 0
         return self.get_observation(), self.get_info() # useful for evaluation
 
+
     def step(self, action): # runs one timestep of the env, one action.
-        points_gained, _ = self.game.apply_move(int(action)) # This is what the game apply_move() function returns based on the action
+        merges_extended, _ = self.game.apply_move(int(action)) # This is what the game apply_move() function returns based on the action
         # apply_move() runs preview_move(), which simulates the move without changing the board.
         # If it sees that it will change the board, it applies that move. (The second value it returns, "changed", isn't needed here:
         # MaskedDQN never chooses a blocked move, and even if one arrived, apply_move() would simply do nothing.)
         self.moves += 1
-        reward = float(points_gained)
-        # reward is set to points gained, which means the more points the AI gets, the more it is rewarded, encouraging it to get more points.
+        reward = float(np.log2(merges_extended).sum())
+        # reward is downscaled using log2, which means the more points the AI gets, the more it is rewarded, encouraging it to get more points.
         terminated = self.game.is_game_over() # checks if the game is over (grid covered in tiles, no more moves possible)
         truncated = self.moves >= self.max_moves # if moves is more than 10k, then termination of the env
         # Safety net only: with masking, every move changes the board and games always end naturally.
         info = self.get_info()
         return self.get_observation(), reward, terminated, truncated, info
+
 
     def render(self):
         print(self.game.board)

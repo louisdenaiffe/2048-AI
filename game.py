@@ -43,17 +43,17 @@ class Game2048:
     @staticmethod
     def merge_line(line): # careful, input here is not the board but an individual row
         tiles = line[line != 0].tolist() # transforms it into a list, without the null elements. (so np.array([3, 0, 3, 4]) -> [3, 3, 4])
-        merged, points, i = [], 0, 0
-        # The whole merging math, boring
-        while i < len(tiles):
-            value = tiles[i]
-            if i + 1 < len(tiles) and value == tiles[i + 1]:
-                value *= 2
-                points += value
-                i += 1
-            merged.append(value)
-            i += 1
-        return np.array(merged + [0] * (4 - len(merged)), dtype=np.int32), points
+        merged, merges, i = [], [], 0
+        while i < len(tiles): # we iterate through each tile in the row, starting at indice 0.
+            value = tiles[i]  # initialize a value equal to the first tile
+            if i + 1 < len(tiles) and value == tiles[i + 1]: 
+        # if the indice of the next tile is inferior to the length of the list, and value is equal to that tile:
+                value *= 2      # we multiply that value by 2 (So if the tiles were 64 and 64, we'd get 64 x 2, so 128)
+                merges.append(value) # add that value to points
+                i += 1          # increment to pass to the next tile
+            merged.append(value) # this adds the current value, or the next one, if the if loop was completed.
+            i += 1 # we pass on to the next value. if the if loop was completed, then this means we have advanced two tiles in one while loop iteration.
+        return np.array(merged + [0] * (4 - len(merged)), dtype=np.int32), merges
         # returns the row, merged, as well as the points gained from merging.
         # IMPORTANT: why only left? what if the agent decided on right, up or down? W
         # ell, preview_move() flips the board horizontally and vertically! thats it
@@ -67,23 +67,23 @@ class Game2048:
         # These are writable views: updating a row also updates the copied board.
         if action in (self.ACTION_DOWN, self.ACTION_RIGHT):
             rows = rows[:, ::-1]
-        points = 0
+        merges_extended = []
         for row in rows:
-            merged, gained = self.merge_line(row) # merges each row individually
+            merged, merges = self.merge_line(row) # merges each row individually
             row[:] = merged
-            points += gained
-        return board, points, not np.array_equal(board, self.board)
+            merges_extended.extend(merges)
+        return board, merges_extended, not np.array_equal(board, self.board)
         # returns what the board looks like after that previewed move, the points this move would earn, and whether the board has changed.
 
     def apply_move(self, action):
-        board, points, changed = self.preview_move(action)
+        board, merges_extended, changed = self.preview_move(action)
         if changed:
             self.board[:] = board
-            self.score += points
+            self.score += sum(merges_extended)
             self.add_random_tile()
         # If the board has changed after previewing the move, then apply that move.
         # Then add another random tile to the board.
-        return points, changed
+        return merges_extended, changed
 
     def get_valid_actions(self):
         return [action for action in range(4) if self.preview_move(action)[2]]
