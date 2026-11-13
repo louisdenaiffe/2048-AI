@@ -1,10 +1,11 @@
 import argparse
-from pathlib import Path
 
 from stable_baselines3.common.monitor import Monitor
 
 from environment import Game2048Env
 from masked_dqn import MaskedDQN # DQN with action masking (see masked_dqn.py)
+from model_files import model_files # where each model's files are saved (see model_files.py)
+from score_callback import ScoreEvalCallback # evaluation during training (see score_callback.py)
 
 
 def main():
@@ -12,15 +13,22 @@ def main():
     parser.add_argument("--steps", type=int, default=200_000) 
     # Adds a command-line argument --steps to the parser, which specifies the number of training steps for the model. The default value is set to 200,000.
     parser.add_argument("--model", default="dqn_2048") 
-    # Adds a command-line argument --model to the parser, which specifies the name of the model file to save or load. The default value is set to "dqn_2048".
+    # Adds a command-line argument --model to the parser, which specifies the name of the model to save or load. The default value is set to "dqn_2048".
+    # All of its files are saved in models/<name>/ (see model_files.py).
     parser.add_argument("--continue-training", action="store_true", help="Continue training an existing model") 
     # Adds a command-line argument --continue-training to the parser, which is a boolean flag. If this flag is provided, it indicates that the user wants to continue training an existing model instead of creating a new one.
     parser.add_argument("--seed", type=int, default=None, help="Random seed for a new training run")
+    parser.add_argument("--eval-freq", type=int, default=100_000, help="Evaluate the model every this many training steps")
+    parser.add_argument("--eval-games", type=int, default=20, help="Number of games played at each evaluation")
     args = parser.parse_args() # Parses the command-line arguments and assigns the parsed values to the variable args. This allows access to the values of the --steps, --model, and --continue-training arguments.
 
     env = Monitor(Game2048Env()) # Creates an instance of the Game2048Env environment and wraps it with the Monitor class. The Monitor class is used to record training statistics, such as episode rewards and lengths, during the training process.
-    model_path = Path(args.model if args.model.endswith(".zip") else f"{args.model}.zip") # Model path
-    replay_path = model_path.with_suffix(".replay.pkl") # The model's saved experiences
+    files = model_files(args.model) # the paths of all of this model's files, in models/<name>/
+    files.folder.mkdir(parents=True, exist_ok=True) # creates the folder (and models/ itself) if it doesn't exist yet
+    model_path = files.model # The model
+    replay_path = files.replay_buffer # The model's saved experiences
+    eval_csv_path = files.eval_csv # The evaluation results during training
+    best_model_path = files.best_model # The best model seen during training
 
     try:
         if args.continue_training: # This will run if the --continue_training flag is provided when executing the script. 
@@ -30,7 +38,7 @@ def main():
             print(f"Continuing {model_path} for {args.steps:,} steps")
 
             model = MaskedDQN.load(
-                args.model,
+                model_path,
                 env=env,
                 device="auto",
             )
@@ -65,16 +73,26 @@ def main():
             )
             reset_timesteps = True
 
+        callback = ScoreEvalCallback(
+            eval_freq=args.eval_freq,
+            n_games=args.eval_games,
+            csv_path=eval_csv_path,
+            best_model_path=best_model_path,
+            append=args.continue_training, # continuing a run adds to its existing CSV, a new run starts a new one
+        )
+
         model.learn(
             total_timesteps=args.steps,
             reset_num_timesteps=reset_timesteps,
             progress_bar=True,
+            callback=callback, # SB3 calls the callback during training (see score_callback.py)
         )
 
         model.save(model_path)
         model.save_replay_buffer(replay_path)
         print(f"Saved model to {model_path}")
         print(f"Saved replay buffer to {replay_path}")
+        print(f"Evaluation results in {eval_csv_path}, best model in {best_model_path}")
 
     finally:
         env.close()
