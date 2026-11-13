@@ -4,13 +4,21 @@ from gymnasium import spaces
 from game import Game2048
 
 
+NUM_TILE_VALUES = 16 # possible values per cell: empty, 2, 4, 8, ..., 32768 (exponents 0 to 15)
+
+
 def encode_board(board):
-    # Converts the 4x4 board into the 16 numbers the model receives
-    return np.log2(np.maximum(board, 1)).astype(np.float32).ravel()
-    # Here: np.maximum transforms 0s into 1s to avoid log2(0)
-    # np.log2() converts tiles into their exponents. So 1 -> 0, 2 -> 1, 4 -> 2, 8 -> 3, etc... This keeps inputs on a smaller scale.
-    # .astype(np.float32) converts the numbers into the numeric type awaited by the env.
-    # .ravel() flattens the 4x4 grid into an array, reading row by row.
+    # Converts the 4x4 board into the 256 numbers the model receives (one-hot encoding):
+    # each of the 16 cells becomes 16 yes/no values, with a single 1 at the position of its tile's exponent.
+    exponents = np.log2(np.maximum(board, 1)).astype(np.int64).ravel()
+    # np.maximum transforms 0s into 1s to avoid log2(0), so empty cells get exponent 0.
+    # np.log2() converts tiles into their exponents: 2 -> 1, 4 -> 2, 8 -> 3, etc...
+    # .astype(np.int64) makes them whole numbers, so they can be used as indices. .ravel() flattens the 4x4 grid into 16 values, row by row.
+    one_hot = np.eye(NUM_TILE_VALUES, dtype=np.float32)[exponents]
+    # np.eye(16) is the identity matrix: row k has a single 1, in position k, which is exactly the one-hot vector of exponent k.
+    # Indexing it with the 16 exponents picks one row per cell, giving a (16 cells, 16 values) array.
+    return one_hot.ravel()
+    # Flattens it into 256 values: the 16 values of cell 0, then the 16 values of cell 1, etc...
 
 
 class Game2048Env(gym.Env): # Defines the env by inheriting from the Gym's base env class, gym.Env
@@ -22,10 +30,10 @@ class Game2048Env(gym.Env): # Defines the env by inheriting from the Gym's base 
         self.max_moves = max_moves
         self.moves = 0
         self.action_space = spaces.Discrete(4) # Four possible action numbers: 0, 1, 2, 3
-        self.observation_space = spaces.Box(low=0, high=31, shape=(16,), dtype=np.float32)
+        self.observation_space = spaces.Box(low=0, high=1, shape=(16 * NUM_TILE_VALUES,), dtype=np.float32)
         # Here, this defines the observation space (the EXPECTED data format):
-        # shape(16,) is a one-dimensional array of 16 values
-        # low=0, high=31 means each encoded value must be between 0 and 31
+        # shape(256,) is a one-dimensional array of 16 cells x 16 possible values = 256 values
+        # low=0, high=1 means each encoded value is between 0 and 1 (here, always exactly 0 or 1)
         # dtype=np,float32 each value is a 32-bit floating-point number
 
 

@@ -3,15 +3,20 @@ import torch
 import torch.nn.functional as F
 from stable_baselines3 import DQN
 
+from environment import NUM_TILE_VALUES
+
 
 # DQN with action masking: the agent can only choose moves that change the board,
 # while exploring, while playing, and when computing its learning targets.
 
 
 def valid_action_mask(observations):
-    # observations: a torch tensor of shape (N, 16), N encoded boards (log2 values, 0 = empty cell).
+    # observations: a torch tensor of shape (N, 256), N one-hot encoded boards (see encode_board in environment.py).
     # Returns a (N, 4) tensor of True/False: is action 0 (up), 1 (down), 2 (left), 3 (right) valid on each board?
-    boards = observations.reshape(-1, 4, 4) # back into 4x4 grids. The first dimension (N) is the board number.
+    exponents = observations.reshape(-1, 16, NUM_TILE_VALUES).argmax(dim=2)
+    # Decodes the one-hot back into exponents: (N boards, 16 cells, 16 values) -> (N boards, 16 cells).
+    # In each cell, the position of the 1 IS the exponent (0 = empty), and argmax finds the position of the largest value, so of the 1.
+    boards = exponents.reshape(-1, 4, 4) # back into 4x4 grids. The first dimension (N) is the board number.
 
     # Every pair of horizontal neighbours: west is the left cell, east is the right cell of each pair.
     west, east = boards[:, :, :-1], boards[:, :, 1:]

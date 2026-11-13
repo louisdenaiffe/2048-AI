@@ -46,7 +46,8 @@ def main():
             print(f"Creating a new model for {args.steps:,} steps")
 
             model = MaskedDQN(
-                policy="MlpPolicy", # The board has 16 numbers, so the input layer of the MLP policy will have 16 neurons. The output layer will have 4 neurons, corresponding to the 4 possible actions (up, down, left, right) in the game.
+                policy="MlpPolicy", # The board is one-hot encoded into 256 numbers, so the input layer of the MLP policy will have 256 neurons. The output layer will have 4 neurons, corresponding to the 4 possible actions (up, down, left, right) in the game.
+                policy_kwargs=dict(net_arch=[256, 256]), # Two hidden layers of 256 neurons each (the default is [64, 64], too small to learn much more than a simple corner strategy).
                 env=env,
                 learning_rate=0.0001, # Conservative learning rate, to avoid unstability in training.
                 buffer_size=100_000, # Keeps many varied experiences in the replay buffer, without using excessive memory.
