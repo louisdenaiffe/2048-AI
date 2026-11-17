@@ -5,6 +5,7 @@ from game import Game2048
 
 
 NUM_TILE_VALUES = 16 # possible values per cell: empty, 2, 4, 8, ..., 32768 (exponents 0 to 15)
+EMPTY_CELL_BONUS = 0.1
 
 
 def encode_board(board):
@@ -65,6 +66,8 @@ class Game2048Env(gym.Env): # Defines the env by inheriting from the Gym's base 
         self.moves += 1
         reward = float(np.log2(merges_extended).sum())
         # reward is downscaled using log2, which means the more points the AI gets, the more it is rewarded, encouraging it to get more points.
+        empty_cells = np.count_nonzero(self.game.board == 0)
+        reward += EMPTY_CELL_BONUS * empty_cells
         terminated = self.game.is_game_over() # checks if the game is over (grid covered in tiles, no more moves possible)
         truncated = self.moves >= self.max_moves # if moves is more than 10k, then termination of the env
         # Safety net only: with masking, every move changes the board and games always end naturally.
