@@ -62,6 +62,8 @@ def main():
                 target_update_interval=30000,
                 batch_size=128, # Provides relatively stable updates, while remaining computationally efficient.
                 gamma=0.99, # Values long-term rewards strongly, because good early moves can enable much better tiles later.
+                n_steps=3, # n-step returns: each target adds up the REAL rewards of the next 3 moves, then the Q-value of the board 3 moves later
+                # (instead of 1 move + Q-value). The consequences of a move reach it faster. Kept small, since the 5% random moves slightly bias longer returns.
                 train_freq=4, # Trains once every four environment moves. This reduces computation and prevents excessive learning from very similar consecutive experiences.
                 gradient_steps=1, # Performs one neural-network update whenever training occurs—a stable, efficient baseline.
                 exploration_fraction=0.25, # Gradually transitions from random exploration to learned behavior during the first 30% of training.
