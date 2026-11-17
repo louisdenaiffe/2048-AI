@@ -11,18 +11,16 @@ MODELS_DIR = Path(__file__).parent / "models" # the "models" folder next to this
 class ModelFiles(NamedTuple): # a NamedTuple is a small object whose values are accessed by name, e.g. files.model
     folder: Path
     model: Path # the model at the end of training
-    best_model: Path # the best model seen during training (saved by score_callback.py)
     replay_buffer: Path # the saved experiences, to continue training later
     eval_csv: Path # the evaluation results during training (read by plot_runs.py)
 
 
 def model_files(name):
-    # "big_v1" -> models/big_v1/model.zip, models/big_v1/best_model.zip, etc.
+    # "big_v1" -> models/big_v1/model.zip, models/big_v1/eval.csv, etc.
     folder = MODELS_DIR / name.removesuffix(".zip") # accepts "big_v1.zip" too, out of habit
     return ModelFiles(
         folder=folder,
         model=folder / "model.zip",
-        best_model=folder / "best_model.zip",
         replay_buffer=folder / "replay_buffer.pkl",
         eval_csv=folder / "eval.csv",
     )
@@ -30,7 +28,7 @@ def model_files(name):
 
 def find_model_to_load(name_or_path):
     # For evaluate.py and watch_ai.py: accepts a model name ("big_v1" -> models/big_v1/model.zip)
-    # or the path of a specific file (e.g. models/big_v1/best_model.zip, to play the best model instead of the final one).
+    # or the path of a specific model file (e.g. an older copy saved by hand).
     if Path(name_or_path).is_file():
         return Path(name_or_path)
     path = model_files(name_or_path).model

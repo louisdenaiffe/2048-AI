@@ -17,26 +17,18 @@ TILES_TO_TRACK = [256, 512, 1024, 2048]
 
 class ScoreEvalCallback(BaseCallback): # BaseCallback is SB3's parent class for callbacks: we fill in the moments we care about.
 
-    def __init__(self, eval_freq, n_games, csv_path, best_model_path, append=False, verbose=1):
+    def __init__(self, eval_freq, n_games, csv_path, append=False, verbose=1):
         super().__init__(verbose)
         self.eval_freq = eval_freq # evaluate every eval_freq training steps
         self.n_games = n_games # number of evaluation games each time (always seeds 0 to n_games-1, so always the same games)
         self.csv_path = csv_path # where the results are saved, one row per evaluation
-        self.best_model_path = best_model_path # where the best model so far is saved
         self.append = append # True when continuing a training run: add to the existing CSV instead of starting a new one
-        self.best_mean_score = -np.inf # best mean score so far (-infinity, so the first evaluation is always "the best")
         self.last_eval_step = None # step of the last evaluation, to avoid evaluating twice at the same step
 
     def _on_training_start(self):
         # Called once, at the start of model.learn().
-        if self.append and self.csv_path.exists():
-            # Continuing a run: keep the existing results, and remember the best score so far,
-            # so _best.zip isn't replaced by a worse model.
-            with open(self.csv_path, newline="") as file:
-                previous_scores = [float(row["mean_score"]) for row in csv.DictReader(file)]
-            if previous_scores:
-                self.best_mean_score = max(previous_scores)
-        else:
+        # Continuing a run (append, with an existing CSV): nothing to do, new rows are simply added at the end.
+        if not (self.append and self.csv_path.exists()):
             # New run: create the CSV file with only its header row (overwrites the results of an older run with the same name).
             with open(self.csv_path, "w", newline="") as file:
                 csv.writer(file).writerow(["timesteps", "mean_score", "median_score", "best_tile"] + [f"reached_{tile}" for tile in TILES_TO_TRACK])
@@ -74,16 +66,9 @@ class ScoreEvalCallback(BaseCallback): # BaseCallback is SB3's parent class for 
         for tile in TILES_TO_TRACK[:3]: # 256, 512, 1024 (2048 would only add a column of zeros for now)
             self.logger.record(f"eval/reached_{tile}_%", reached[tile])
 
-        new_best = mean_score > self.best_mean_score
-        if new_best: # keeps a copy of the best model seen so far (the last model isn't always the best one)
-            self.best_mean_score = mean_score
-            self.model.save(self.best_model_path)
-
         if self.verbose:
             print(
                 f"[eval] step {self.num_timesteps:,}: mean score {mean_score:.0f}, "
-                + ", ".join(f"{tile}: {reached[tile]:.0f}%" for tile in TILES_TO_TRACK[:3])
-                + (" (new best, saved)" if new_best else "")
-                + f" [{time.time() - start:.1f}s]"
+                + ", ".join(f"{tile}: {reached[tile]:.0f}%" for tile in TILES_TO_TRACK[:3])                + f" [{time.time() - start:.1f}s]"
             )
         self.last_eval_step = self.num_timesteps

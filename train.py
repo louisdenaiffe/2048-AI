@@ -28,7 +28,6 @@ def main():
     model_path = files.model # The model
     replay_path = files.replay_buffer # The model's saved experiences
     eval_csv_path = files.eval_csv # The evaluation results during training
-    best_model_path = files.best_model # The best model seen during training
 
     try:
         if args.continue_training: # This will run if the --continue_training flag is provided when executing the script. 
@@ -57,14 +56,15 @@ def main():
                 policy="MlpPolicy", # The board is one-hot encoded into 256 numbers, so the input layer of the MLP policy will have 256 neurons. The output layer will have 4 neurons, corresponding to the 4 possible actions (up, down, left, right) in the game.
                 policy_kwargs=dict(net_arch=[256, 256]), # Two hidden layers of 256 neurons each (the default is [64, 64], too small to learn much more than a simple corner strategy).
                 env=env,
-                learning_rate=0.0001, # Conservative learning rate, to avoid unstability in training.
+                learning_rate=lambda progress_remaining: 5e-5 + progress_remaining * (1e-4 - 5e-5), # Conservative learning rate, to avoid unstability in training.
                 buffer_size=500_000, # Keeps many varied experiences in the replay buffer, without using excessive memory.
                 learning_starts=10_000, # Collect 10k experiences before starting to train the mode, ensures that it doesnt start learning from a small, random number of experiences.
+                target_update_interval=30000,
                 batch_size=128, # Provides relatively stable updates, while remaining computationally efficient.
                 gamma=0.99, # Values long-term rewards strongly, because good early moves can enable much better tiles later.
                 train_freq=4, # Trains once every four environment moves. This reduces computation and prevents excessive learning from very similar consecutive experiences.
                 gradient_steps=1, # Performs one neural-network update whenever training occurs—a stable, efficient baseline.
-                exploration_fraction=0.5, # Gradually transitions from random exploration to learned behavior during the first 30% of training.
+                exploration_fraction=0.25, # Gradually transitions from random exploration to learned behavior during the first 30% of training.
                 exploration_initial_eps=1.0, # Starts completely random so the replay buffer receives varied experiences.
                 exploration_final_eps=0.05, # Keeps 5% randomness, allowing occasional discovery of new situations instead of permanently following one strategy.
                 seed=args.seed, # Different seeds give independent training runs; used for new models only.
@@ -77,7 +77,6 @@ def main():
             eval_freq=args.eval_freq,
             n_games=args.eval_games,
             csv_path=eval_csv_path,
-            best_model_path=best_model_path,
             append=args.continue_training, # continuing a run adds to its existing CSV, a new run starts a new one
         )
 
@@ -92,7 +91,7 @@ def main():
         model.save_replay_buffer(replay_path)
         print(f"Saved model to {model_path}")
         print(f"Saved replay buffer to {replay_path}")
-        print(f"Evaluation results in {eval_csv_path}, best model in {best_model_path}")
+        print(f"Evaluation results in {eval_csv_path}")
 
     finally:
         env.close()
