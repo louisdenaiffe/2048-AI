@@ -56,7 +56,7 @@ def main():
                 policy="MlpPolicy", # The board is one-hot encoded into 256 numbers, so the input layer of the MLP policy will have 256 neurons. The output layer will have 4 neurons, corresponding to the 4 possible actions (up, down, left, right) in the game.
                 policy_kwargs=dict(net_arch=[256, 256]), # Two hidden layers of 256 neurons each (the default is [64, 64], too small to learn much more than a simple corner strategy).
                 env=env,
-                learning_rate=lambda progress_remaining: 5e-5 + progress_remaining * (1e-4 - 5e-5), # Conservative learning rate, to avoid unstability in training.
+                learning_rate=1e-4, # Constant: decay didn't improve results (big_v4/v5 vs big_v3), and a constant rate keeps --continue-training simple.
                 buffer_size=500_000, # Keeps many varied experiences in the replay buffer, without using excessive memory.
                 learning_starts=10_000, # Collect 10k experiences before starting to train the mode, ensures that it doesnt start learning from a small, random number of experiences.
                 target_update_interval=30000,
