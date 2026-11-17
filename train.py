@@ -19,7 +19,7 @@ def main():
     # Adds a command-line argument --continue-training to the parser, which is a boolean flag. If this flag is provided, it indicates that the user wants to continue training an existing model instead of creating a new one.
     parser.add_argument("--seed", type=int, default=None, help="Random seed for a new training run")
     parser.add_argument("--eval-freq", type=int, default=100_000, help="Evaluate the model every this many training steps")
-    parser.add_argument("--eval-games", type=int, default=20, help="Number of games played at each evaluation")
+    parser.add_argument("--eval-games", type=int, default=100, help="Number of games played at each evaluation")
     args = parser.parse_args() # Parses the command-line arguments and assigns the parsed values to the variable args. This allows access to the values of the --steps, --model, and --continue-training arguments.
 
     env = Monitor(Game2048Env()) # Creates an instance of the Game2048Env environment and wraps it with the Monitor class. The Monitor class is used to record training statistics, such as episode rewards and lengths, during the training process.
@@ -58,13 +58,13 @@ def main():
                 policy_kwargs=dict(net_arch=[256, 256]), # Two hidden layers of 256 neurons each (the default is [64, 64], too small to learn much more than a simple corner strategy).
                 env=env,
                 learning_rate=0.0001, # Conservative learning rate, to avoid unstability in training.
-                buffer_size=100_000, # Keeps many varied experiences in the replay buffer, without using excessive memory.
+                buffer_size=500_000, # Keeps many varied experiences in the replay buffer, without using excessive memory.
                 learning_starts=10_000, # Collect 10k experiences before starting to train the mode, ensures that it doesnt start learning from a small, random number of experiences.
                 batch_size=128, # Provides relatively stable updates, while remaining computationally efficient.
                 gamma=0.99, # Values long-term rewards strongly, because good early moves can enable much better tiles later.
                 train_freq=4, # Trains once every four environment moves. This reduces computation and prevents excessive learning from very similar consecutive experiences.
                 gradient_steps=1, # Performs one neural-network update whenever training occurs—a stable, efficient baseline.
-                exploration_fraction=0.3, # Gradually transitions from random exploration to learned behavior during the first 30% of training.
+                exploration_fraction=0.5, # Gradually transitions from random exploration to learned behavior during the first 30% of training.
                 exploration_initial_eps=1.0, # Starts completely random so the replay buffer receives varied experiences.
                 exploration_final_eps=0.05, # Keeps 5% randomness, allowing occasional discovery of new situations instead of permanently following one strategy.
                 seed=args.seed, # Different seeds give independent training runs; used for new models only.
