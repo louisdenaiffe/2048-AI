@@ -81,8 +81,9 @@ class MaskedDQN(DQN): # Inherits everything from SB3's DQN, we only replace how 
         # They only differ for continuous actions, for us they are the same.
 
     def train(self, gradient_steps, batch_size=100):
-        # Copy of SB3's DQN.train() (stable-baselines3 2.9), with one change, marked CHANGED below:
-        # the "best Q-value of the next board" only considers moves that are valid on that next board.
+        # Copy of SB3's DQN.train() (stable-baselines3 2.9), with two changes, marked CHANGED below:
+        # the "best move on the next board" only considers moves that are valid on that next board,
+        # and it is chosen by the main network but scored by the target network (Double DQN).
         self.policy.set_training_mode(True) # switches the network to training mode
         self._update_learning_rate(self.policy.optimizer) # applies the learning rate schedule
 
@@ -93,16 +94,23 @@ class MaskedDQN(DQN): # Inherits everything from SB3's DQN, we only replace how 
             discounts = replay_data.discounts if replay_data.discounts is not None else self.gamma
 
             with torch.no_grad():
-                # The target: what the Q-value of (board, action) should be = reward + gamma * best Q-value of the next board.
-                next_q_values = self.q_net_target(replay_data.next_observations) # (batch_size, 4)
+                # The target: what the Q-value of (board, action) should be = reward + gamma * Q-value of the best move on the next board.
+                # CHANGED (Double DQN): the main network CHOOSES the best next move, the target network SCORES it.
+                # Plain DQN lets the target network do both, so it always picks whichever Q-value happens to be overestimated,
+                # and those overestimates pile up over long games. With two networks, one network's errors don't get picked by the other.
+                next_mask = valid_action_mask(replay_data.next_observations) # (batch_size, 4): True where the move is valid
 
-                # CHANGED: blocked moves on the next board get -inf, so max() ignores them.
-                next_mask = valid_action_mask(replay_data.next_observations)
-                next_q_values[~next_mask] = -torch.inf
-                next_q_values, _ = next_q_values.max(dim=1)
-                # If the next board has no valid move at all (game over), every value was -inf.
-                # The target should then just be the reward, so we replace -inf with 0
-                # (otherwise -inf * 0 later would give NaN, "not a number", and break the training).
+                # CHANGED: the main network chooses the best VALID next move (blocked moves get -inf, so argmax ignores them).
+                online_next_q_values = self.q_net(replay_data.next_observations) # (batch_size, 4)
+                online_next_q_values[~next_mask] = -torch.inf
+                best_next_actions = online_next_q_values.argmax(dim=1, keepdim=True) # (batch_size, 1)
+
+                # CHANGED: the target network gives the Q-value of that chosen move.
+                next_q_values = self.q_net_target(replay_data.next_observations) # (batch_size, 4)
+                next_q_values = torch.gather(next_q_values, dim=1, index=best_next_actions).squeeze(1) # (batch_size,)
+                # If the next board has no valid move at all (game over), argmax picked an arbitrary move.
+                # The target should then just be the reward, so we replace its value with 0
+                # ((1 - dones) below already removes it, this is a safety net, like before).
                 next_q_values = torch.where(next_mask.any(dim=1), next_q_values, torch.zeros_like(next_q_values))
 
                 next_q_values = next_q_values.reshape(-1, 1)
