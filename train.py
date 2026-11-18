@@ -20,6 +20,8 @@ def main():
     parser.add_argument("--seed", type=int, default=None, help="Random seed for a new training run")
     parser.add_argument("--eval-freq", type=int, default=100_000, help="Evaluate the model every this many training steps")
     parser.add_argument("--eval-games", type=int, default=100, help="Number of games played at each evaluation")
+    parser.add_argument("--eval-lookahead", action="store_true",
+                        help="Also evaluate with a 1-move lookahead at each evaluation (saved in eval_lookahead.csv, plot with plot_runs.py --lookahead)")
     args = parser.parse_args() # Parses the command-line arguments and assigns the parsed values to the variable args. This allows access to the values of the --steps, --model, and --continue-training arguments.
 
     env = Monitor(Game2048Env()) # Creates an instance of the Game2048Env environment and wraps it with the Monitor class. The Monitor class is used to record training statistics, such as episode rewards and lengths, during the training process.
@@ -69,7 +71,7 @@ def main():
                 exploration_fraction=0.25, # Gradually transitions from random exploration to learned behavior during the first 30% of training.
                 exploration_initial_eps=1.0, # Starts completely random so the replay buffer receives varied experiences.
                 exploration_final_eps=0.01, #
-                train_lookahead_depth=1, # While collecting experience, non-random moves are chosen with a 1-move lookahead (see lookahead.py),
+                train_lookahead_depth=2, # While collecting experience, non-random moves are chosen with a 1-move lookahead (see lookahead.py),
                 # so training games go further and the network sees many more late-game boards. 0 = classic DQN (best Q-value).
                 seed=args.seed, # Different seeds give independent training runs; used for new models only.
                 verbose=1,
@@ -81,6 +83,7 @@ def main():
             eval_freq=args.eval_freq,
             n_games=args.eval_games,
             csv_path=eval_csv_path,
+            lookahead_csv_path=files.eval_lookahead_csv if args.eval_lookahead else None, # greedy curve always, lookahead curve on request
             append=args.continue_training, # continuing a run adds to its existing CSV, a new run starts a new one
         )
 
@@ -95,7 +98,7 @@ def main():
         model.save_replay_buffer(replay_path)
         print(f"Saved model to {model_path}")
         print(f"Saved replay buffer to {replay_path}")
-        print(f"Evaluation results in {eval_csv_path}")
+        print(f"Evaluation results in {eval_csv_path}" + (f" and {files.eval_lookahead_csv}" if args.eval_lookahead else ""))
 
     finally:
         env.close()

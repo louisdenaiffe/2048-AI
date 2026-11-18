@@ -120,7 +120,28 @@ def move_values(model, boards, depth):
     return values
 
 
+DEPTH_3_MAX_EMPTY = 4
+DEPTH_4_MAX_EMPTY = 2
+# Depths 3 and 4 are "adaptive": the deep searches only happen on crowded boards, open boards get a 2-move search.
+#   --lookahead 3: 3 moves if at most DEPTH_3_MAX_EMPTY empty cells, otherwise 2.
+#   --lookahead 4: 4 moves if at most DEPTH_4_MAX_EMPTY empty cells, otherwise like --lookahead 3.
+# Games are lost on crowded boards, which is where the extra search matters. It is also where it's affordable:
+# fewer empty cells = fewer possible new tiles, so a deep search there costs about as much as a shallower one on an open board.
+
+
+def adaptive_depth(board, depth):
+    # The depth actually searched for this board (exponents), given the requested --lookahead depth.
+    if depth <= 2:
+        return depth # depths 1 and 2 are always used as is
+    empty_cells = (board == 0).sum()
+    if depth >= 4 and empty_cells <= DEPTH_4_MAX_EMPTY:
+        return 4
+    if empty_cells <= DEPTH_3_MAX_EMPTY:
+        return 3
+    return 2
+
+
 def lookahead_action(model, observation, depth):
     # The move chosen by a lookahead of the given depth, for one one-hot encoded board (see encode_board()).
     board = observation.reshape(16, NUM_TILE_VALUES).argmax(axis=1).reshape(1, 4, 4) # one-hot -> exponents
-    return int(move_values(model, board, depth)[0].argmax())
+    return int(move_values(model, board, adaptive_depth(board, depth))[0].argmax())

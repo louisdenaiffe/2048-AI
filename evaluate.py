@@ -8,11 +8,12 @@ from model_files import find_model_to_load
 # This is for evaluating models and seeing how they compare to each other.
 
 
-def play_games(model, number_of_games=100):
-    env = Game2048Env()  # Creates a Game2048Env instance 
+def play_games(model, number_of_games=100, first_seed=0):
+    # Plays the games with seeds first_seed, first_seed+1, ... (seeds 0-99 by default, the same games every time).
+    env = Game2048Env()  # Creates a Game2048Env instance
     scores = []
     largest_tiles = []
-    for game_number in range(number_of_games):  # we iterate through each game
+    for game_number in range(first_seed, first_seed + number_of_games):  # we iterate through each game
         observation, info = env.reset(seed=game_number)  # starts a new game, and returns the game board + info about game stats, like the score, the largest tile...
         finished = False
         while not finished:
@@ -32,15 +33,20 @@ def play_games(model, number_of_games=100):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", default="dqn_2048", help="A model name (loads models/<name>/model.zip) or the path of a model file")
-    parser.add_argument("--lookahead", type=int, nargs="?", const=1, default=0, choices=[0, 1, 2],
-                        help="Choose moves with a lookahead search: --lookahead = 1 move, --lookahead 2 = 2 moves (see lookahead.py)")
+    parser.add_argument("--lookahead", type=int, nargs="?", const=1, default=0, choices=[0, 1, 2, 3, 4],
+                        help="Choose moves with a lookahead search: --lookahead = 1 move, --lookahead 2 = 2 moves, "
+                             "3 and 4 = up to 3 or 4 moves on crowded boards and 2 otherwise (see lookahead.py)")
     # nargs="?" with const=1: "--lookahead" alone means 1, "--lookahead 2" means 2, no flag at all means 0 (greedy).
+    parser.add_argument("--games", type=int, default=100, help="Number of games to play")
+    parser.add_argument("--seed-offset", type=int, default=0,
+                        help="Seed of the first game. 0 = the usual games (seeds 0-99); e.g. 1000 = fresh games never used to make decisions")
     args = parser.parse_args()
 
     model = MaskedDQN.load(find_model_to_load(args.model)) # MaskedDQN can also load models trained with plain DQN, and plays them with masking
     model.lookahead_depth = args.lookahead # 0 by default: greedy play, comparable with the learning curves
     print("Lookahead:", f"{args.lookahead} move(s)" if args.lookahead else "off")
-    scores, largest_tiles = play_games(model)
+    print(f"Seeds: {args.seed_offset}-{args.seed_offset + args.games - 1}")
+    scores, largest_tiles = play_games(model, number_of_games=args.games, first_seed=args.seed_offset)
     # calls the function and passes on the scores and largest_tiles lists
 
     # Benchmarking: mean, median, max, mean of the largest tiles, best tile.

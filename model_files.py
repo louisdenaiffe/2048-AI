@@ -12,7 +12,8 @@ class ModelFiles(NamedTuple): # a NamedTuple is a small object whose values are 
     folder: Path
     model: Path # the model at the end of training
     replay_buffer: Path # the saved experiences, to continue training later
-    eval_csv: Path # the evaluation results during training (read by plot_runs.py)
+    eval_csv: Path # the evaluation results during training, greedy play (read by plot_runs.py)
+    eval_lookahead_csv: Path # the same, played with a 1-move lookahead (only with train.py --eval-lookahead; plot_runs.py --lookahead)
 
 
 def model_files(name):
@@ -23,6 +24,7 @@ def model_files(name):
         model=folder / "model.zip",
         replay_buffer=folder / "replay_buffer.pkl",
         eval_csv=folder / "eval.csv",
+        eval_lookahead_csv=folder / "eval_lookahead.csv",
     )
 
 

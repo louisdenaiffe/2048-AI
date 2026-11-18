@@ -41,6 +41,8 @@ def main():
     parser.add_argument("models", nargs="+", help="One or more model names (reads models/<name>/eval.csv)") # nargs="+" means "one or more values"
     parser.add_argument("--out", default="runs.png", help="Where to save the image")
     parser.add_argument("--show", action="store_true", help="Also open the chart in a window")
+    parser.add_argument("--lookahead", action="store_true",
+                        help="Plot the curves played with a 1-move lookahead (eval_lookahead.csv, from train.py --eval-lookahead) instead of greedy")
     args = parser.parse_args()
 
     if len(args.models) > len(RUN_COLORS):
@@ -48,9 +50,11 @@ def main():
 
     runs = {}
     for name in args.models:
-        csv_path = model_files(name).eval_csv
+        files = model_files(name)
+        csv_path = files.eval_lookahead_csv if args.lookahead else files.eval_csv
         if not csv_path.exists():
-            parser.error(f"No evaluation results at {csv_path} (models trained before score_callback.py existed don't have any)")
+            hint = "train it with --eval-lookahead" if args.lookahead else "models trained before score_callback.py existed don't have any"
+            parser.error(f"No evaluation results at {csv_path} ({hint})")
         runs[Path(name).name] = read_run(csv_path) # Path(name).name keeps only the last part, in case a path was given
 
     figure, axes = plt.subplots(1, len(PANELS), figsize=(13, 5), facecolor=SURFACE)
@@ -86,7 +90,8 @@ def main():
                         fontsize=8, color=INK, va="center", annotation_clip=False)
 
         # Discreet axes and grid, so the data stands out.
-        ax.set_title(title, loc="left", fontsize=11, color=INK, pad=10)
+        play_mode = "1-move lookahead" if args.lookahead else "greedy"
+        ax.set_title(f"{title}, {play_mode}", loc="left", fontsize=11, color=INK, pad=10) # says how the games were played, so charts aren't mixed up
         ax.set_xlabel("Training steps (millions)", fontsize=9, color=MUTED)
         ax.grid(axis="y", color=GRID, linewidth=0.8)
         ax.set_axisbelow(True)

@@ -75,9 +75,9 @@ class MaskedDQN(DQN): # Inherits everything from SB3's DQN, we only replace how 
         return actions, vectorized
 
     lookahead_depth = 0
-    # 0 = greedy (the best Q-value), 1 or 2 = choose moves with a lookahead search of that many moves (see lookahead.py).
+    # 0 = greedy (the best Q-value), 1-4 = choose moves with a lookahead search (3 and 4 are adaptive, see lookahead.py).
     # 0 by default, so the evaluations during training (the learning curves) stay greedy and comparable between runs.
-    # evaluate.py and watch_ai.py set it with --lookahead (model.lookahead_depth = 1 or 2).
+    # evaluate.py and watch_ai.py set it with --lookahead (model.lookahead_depth = 1 to 4).
 
     def predict(self, observation, state=None, episode_start=None, deterministic=False):
         # Replaces DQN.predict(). Used by evaluate.py, watch_ai.py and the evaluations during training.
