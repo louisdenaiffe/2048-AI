@@ -32,9 +32,14 @@ def play_games(model, number_of_games=100):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", default="dqn_2048", help="A model name (loads models/<name>/model.zip) or the path of a model file")
+    parser.add_argument("--lookahead", type=int, nargs="?", const=1, default=0, choices=[0, 1, 2],
+                        help="Choose moves with a lookahead search: --lookahead = 1 move, --lookahead 2 = 2 moves (see lookahead.py)")
+    # nargs="?" with const=1: "--lookahead" alone means 1, "--lookahead 2" means 2, no flag at all means 0 (greedy).
     args = parser.parse_args()
 
     model = MaskedDQN.load(find_model_to_load(args.model)) # MaskedDQN can also load models trained with plain DQN, and plays them with masking
+    model.lookahead_depth = args.lookahead # 0 by default: greedy play, comparable with the learning curves
+    print("Lookahead:", f"{args.lookahead} move(s)" if args.lookahead else "off")
     scores, largest_tiles = play_games(model)
     # calls the function and passes on the scores and largest_tiles lists
 

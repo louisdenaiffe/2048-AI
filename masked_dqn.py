@@ -4,6 +4,7 @@ import torch.nn.functional as F
 from stable_baselines3 import DQN
 
 from environment import NUM_TILE_VALUES
+from lookahead import lookahead_action # the lookahead search, used when playing (see predict)
 
 
 # DQN with action masking: the agent can only choose moves that change the board,
@@ -62,8 +63,19 @@ class MaskedDQN(DQN): # Inherits everything from SB3's DQN, we only replace how 
                 actions[i] = np.random.choice(valid_actions)
         return actions, vectorized
 
+    lookahead_depth = 0
+    # 0 = greedy (the best Q-value), 1 or 2 = choose moves with a lookahead search of that many moves (see lookahead.py).
+    # 0 by default, so the evaluations during training (the learning curves) stay greedy and comparable between runs.
+    # evaluate.py and watch_ai.py set it with --lookahead (model.lookahead_depth = 1 or 2).
+
     def predict(self, observation, state=None, episode_start=None, deterministic=False):
-        # Replaces DQN.predict(). Used by evaluate.py and watch_ai.py, and during training after the warm-up phase.
+        # Replaces DQN.predict(). Used by evaluate.py, watch_ai.py and the evaluations during training.
+        # (Collecting experience during training uses _sample_action() below instead, so training itself never uses lookahead.)
+        if deterministic and self.lookahead_depth > 0:
+            observations = np.asarray(observation, dtype=np.float32)
+            if observations.ndim == 1: # a single board
+                return lookahead_action(self, observations, self.lookahead_depth), state
+            return np.array([lookahead_action(self, board, self.lookahead_depth) for board in observations]), state
         exploration_rate = 0.0 if deterministic else self.exploration_rate
         actions, vectorized = self._choose_actions(observation, exploration_rate)
         if not vectorized: # a single board was given, so return a single action, not a list of one

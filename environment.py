@@ -8,6 +8,16 @@ NUM_TILE_VALUES = 16 # possible values per cell: empty, 2, 4, 8, ..., 32768 (exp
 EMPTY_CELL_BONUS = 0.1
 
 
+def compute_reward(merges, board):
+    # The reward of one move: merges is the list of tiles created by merging, board is the board after the move AND the new tile.
+    # (lookahead.py computes this same reward for whole batches of boards at once: keep both in sync if the reward changes.)
+    merge_reward = float(np.log2(merges).sum()) if len(merges) else 0.0
+    # reward is downscaled using log2, which means the more points the AI gets, the more it is rewarded, encouraging it to get more points.
+    empty_cells = np.count_nonzero(board == 0)
+    return merge_reward + EMPTY_CELL_BONUS * empty_cells
+    # Small bonus for keeping space free: a crowded board is what ends games, and the merge reward alone doesn't say so.
+
+
 def encode_board(board):
     # Converts the 4x4 board into the 256 numbers the model receives (one-hot encoding):
     # each of the 16 cells becomes 16 yes/no values, with a single 1 at the position of its tile's exponent.
@@ -64,10 +74,7 @@ class Game2048Env(gym.Env): # Defines the env by inheriting from the Gym's base 
         # If it sees that it will change the board, it applies that move. (The second value it returns, "changed", isn't needed here:
         # MaskedDQN never chooses a blocked move, and even if one arrived, apply_move() would simply do nothing.)
         self.moves += 1
-        reward = float(np.log2(merges_extended).sum())
-        # reward is downscaled using log2, which means the more points the AI gets, the more it is rewarded, encouraging it to get more points.
-        empty_cells = np.count_nonzero(self.game.board == 0)
-        reward += EMPTY_CELL_BONUS * empty_cells
+        reward = compute_reward(merges_extended, self.game.board) # merges (log2) + empty-cell bonus, see compute_reward() above
         terminated = self.game.is_game_over() # checks if the game is over (grid covered in tiles, no more moves possible)
         truncated = self.moves >= self.max_moves # if moves is more than 10k, then termination of the env
         # Safety net only: with masking, every move changes the board and games always end naturally.
