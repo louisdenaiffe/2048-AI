@@ -68,7 +68,9 @@ def main():
                 gradient_steps=1, # Performs one neural-network update whenever training occurs—a stable, efficient baseline.
                 exploration_fraction=0.25, # Gradually transitions from random exploration to learned behavior during the first 30% of training.
                 exploration_initial_eps=1.0, # Starts completely random so the replay buffer receives varied experiences.
-                exploration_final_eps=0.01, # 
+                exploration_final_eps=0.01, #
+                train_lookahead_depth=1, # While collecting experience, non-random moves are chosen with a 1-move lookahead (see lookahead.py),
+                # so training games go further and the network sees many more late-game boards. 0 = classic DQN (best Q-value).
                 seed=args.seed, # Different seeds give independent training runs; used for new models only.
                 verbose=1,
                 device="auto", # Automatically uses GPU if available, otherwise defaults to CPU

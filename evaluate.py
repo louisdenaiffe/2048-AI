@@ -52,7 +52,7 @@ def main():
     print("Mean largest tile:", np.mean(largest_tiles))
     print("Best tile:", np.max(largest_tiles))
 
-    for tile in [64, 128, 256, 512, 1024, 2048]:
+    for tile in [64, 128, 256, 512, 1024, 2048, 4096, 8192]: # 4096 and 8192: reachable since lookahead_v1 with --lookahead 2
         percentage = np.mean(np.array(largest_tiles) >= tile) * 100
         print(f"Reached {tile}: {percentage:.1f}%")
 

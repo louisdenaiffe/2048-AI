@@ -44,9 +44,16 @@ def valid_action_mask(observations):
 
 class MaskedDQN(DQN): # Inherits everything from SB3's DQN, we only replace how actions are chosen and how targets are computed.
 
-    def _choose_actions(self, observation, exploration_rate):
-        # Picks one action per board: the valid action with the highest Q-value,
-        # or, with probability exploration_rate, a random valid action.
+    def __init__(self, *args, train_lookahead_depth=0, **kwargs):
+        # train_lookahead_depth: how moves are chosen while COLLECTING EXPERIENCE during training (not how it learns from them):
+        # 0 = the best Q-value (classic DQN), 1 = a 1-move lookahead (see lookahead.py). Exploration (random moves) is unchanged.
+        # It's saved with the model, so --continue-training keeps it. Older models don't have it, so they get 0.
+        self.train_lookahead_depth = train_lookahead_depth
+        super().__init__(*args, **kwargs)
+
+    def _choose_actions(self, observation, exploration_rate, lookahead_depth=0):
+        # Picks one action per board: with probability exploration_rate, a random valid action;
+        # otherwise the valid action with the highest Q-value (lookahead_depth=0), or the one chosen by a lookahead search (1 or 2).
         observation_tensor, vectorized = self.policy.obs_to_tensor(observation)
         # obs_to_tensor also tells us if the input was a batch of boards (vectorized=True) or a single board.
         with torch.no_grad(): # only using the network, not training it
@@ -57,10 +64,14 @@ class MaskedDQN(DQN): # Inherits everything from SB3's DQN, we only replace how 
         actions = q_values.argmax(dim=1).cpu().numpy() # best valid action for each board
 
         mask = mask.cpu().numpy()
+        boards = observation_tensor.cpu().numpy() if lookahead_depth > 0 else None
         for i in range(len(actions)): # exploration, board by board
             valid_actions = np.flatnonzero(mask[i]) # indices of the valid actions, e.g. [0, 1, 3]
             if valid_actions.size and np.random.rand() < exploration_rate:
                 actions[i] = np.random.choice(valid_actions)
+            elif valid_actions.size and lookahead_depth > 0:
+                # Not exploring: the lookahead chooses (only computed here, so random moves don't waste a search).
+                actions[i] = lookahead_action(self, boards[i], lookahead_depth)
         return actions, vectorized
 
     lookahead_depth = 0
@@ -70,14 +81,9 @@ class MaskedDQN(DQN): # Inherits everything from SB3's DQN, we only replace how 
 
     def predict(self, observation, state=None, episode_start=None, deterministic=False):
         # Replaces DQN.predict(). Used by evaluate.py, watch_ai.py and the evaluations during training.
-        # (Collecting experience during training uses _sample_action() below instead, so training itself never uses lookahead.)
-        if deterministic and self.lookahead_depth > 0:
-            observations = np.asarray(observation, dtype=np.float32)
-            if observations.ndim == 1: # a single board
-                return lookahead_action(self, observations, self.lookahead_depth), state
-            return np.array([lookahead_action(self, board, self.lookahead_depth) for board in observations]), state
+        # (Collecting experience during training uses _sample_action() below instead, with train_lookahead_depth.)
         exploration_rate = 0.0 if deterministic else self.exploration_rate
-        actions, vectorized = self._choose_actions(observation, exploration_rate)
+        actions, vectorized = self._choose_actions(observation, exploration_rate, self.lookahead_depth)
         if not vectorized: # a single board was given, so return a single action, not a list of one
             actions = actions[0]
         return actions, state # state is only used by recurrent policies, we just pass it through like DQN does
@@ -85,9 +91,10 @@ class MaskedDQN(DQN): # Inherits everything from SB3's DQN, we only replace how 
     def _sample_action(self, learning_starts, action_noise=None, n_envs=1):
         # Replaces how SB3 picks actions while collecting experience during training.
         # Before learning_starts (warm-up), the original picks a fully random action, which may be blocked.
-        # Here: fully random but valid during warm-up, then epsilon-greedy with masking.
+        # Here: fully random but valid during warm-up, then epsilon-greedy with masking,
+        # where "greedy" is the lookahead's choice if train_lookahead_depth > 0.
         exploration_rate = 1.0 if self.num_timesteps < learning_starts else self.exploration_rate
-        actions, _ = self._choose_actions(self._last_obs, exploration_rate)
+        actions, _ = self._choose_actions(self._last_obs, exploration_rate, self.train_lookahead_depth)
         return actions, actions
         # SB3 expects two versions of the action: the one sent to the env, and the one stored in the replay buffer.
         # They only differ for continuous actions, for us they are the same.
