@@ -97,8 +97,17 @@ def _best_q_values(model, boards):
     return torch.where(mask.any(dim=1), best, torch.zeros_like(best)).cpu().numpy()
 
 
+MAX_BOARDS_PER_BATCH = 1000
+# Each board can lead to up to ~120 new boards (4 moves x up to 15 empty cells x a 2 or a 4), at every level of the search.
+# Deep searches would otherwise build millions of boards at once (several GB of memory), so boards are searched
+# in batches of at most this many: same result, but memory stays bounded (a few hundred MB per process).
+
+
 def move_values(model, boards, depth):
     # Expected value of each of the 4 moves on each board: (N, 4), -inf for blocked moves.
+    if len(boards) > MAX_BOARDS_PER_BATCH:
+        return np.concatenate([move_values(model, boards[start:start + MAX_BOARDS_PER_BATCH], depth)
+                               for start in range(0, len(boards), MAX_BOARDS_PER_BATCH)])
     after, merge_rewards, valid = all_moves(boards)
     board_index, action = np.nonzero(valid) # one entry per valid (board, move) pair
     moved = after[board_index, action]
