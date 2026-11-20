@@ -1,3 +1,4 @@
+import time
 import numpy as np
 import argparse
 from environment import Game2048Env
@@ -8,14 +9,17 @@ from model_files import find_model_to_load
 # This is for evaluating models and seeing how they compare to each other.
 
 
-def play_games(model, number_of_games=100, first_seed=0):
+def play_games(model, number_of_games=100, first_seed=0, per_game=False):
     # Plays the games with seeds first_seed, first_seed+1, ... (seeds 0-99 by default, the same games every time).
+    # per_game=True shows progress: a live line during each game (updated every 50 moves), then each game's result when it ends.
+    start = time.time()
     env = Game2048Env()  # Creates a Game2048Env instance
     scores = []
     largest_tiles = []
     for game_number in range(first_seed, first_seed + number_of_games):  # we iterate through each game
         observation, info = env.reset(seed=game_number)  # starts a new game, and returns the game board + info about game stats, like the score, the largest tile...
         finished = False
+        moves = 0
         while not finished:
             action, _ = model.predict(observation, deterministic=True)
             # Given this board (observation) what move should I choose? Only valid moves are considered, so the agent can't get stuck.
@@ -24,8 +28,21 @@ def play_games(model, number_of_games=100, first_seed=0):
             # Returns the board AFTER the move, points earned from merging (0 if nothing merged), terminated (no moves remain), truncated (move limit reached), and updated stats
             # These are actually all defined in environment.py, so check that out.
             finished = terminated or truncated # checks if the env is finished, if so ends the loop.
+            moves += 1
+            if per_game and moves % 50 == 0:
+                # "\r" goes back to the start of the line, so this line is overwritten in place instead of filling the terminal.
+                print(f"\r  game {game_number - first_seed + 1}/{number_of_games} (seed {game_number}): move {moves}, "
+                      f"score {info['score']}, largest tile {info['largest_tile']}", end="", flush=True)
         scores.append(info["score"]) # appends the score for that game (also called episode) to a score list
         largest_tiles.append(info["largest_tile"]) # same with the largest tile
+        if per_game:
+            elapsed = time.time() - start
+            done = game_number - first_seed + 1
+            print(f"\r\033[KSeed {game_number}: score {info['score']}, largest tile {info['largest_tile']} "
+                  f"[{done}/{number_of_games} games, {elapsed / 60:.0f} min so far, ~{elapsed / done * (number_of_games - done) / 60:.0f} min left]",
+                  flush=True)
+            # \033[K erases the rest of the live line; flush=True: printed immediately, even when the output goes to a file.
+            # "min left" assumes the remaining games take as long as the average so far (longer games = more time).
         # So now we have the score and the largest tile from each game
     env.close()
     return scores, largest_tiles
@@ -40,13 +57,14 @@ def main():
     parser.add_argument("--games", type=int, default=100, help="Number of games to play")
     parser.add_argument("--seed-offset", type=int, default=0,
                         help="Seed of the first game. 0 = the usual games (seeds 0-99); e.g. 1000 = fresh games never used to make decisions")
+    parser.add_argument("--per-game", action="store_true", help="Print each game's seed, score and largest tile as it ends")
     args = parser.parse_args()
 
     model = MaskedDQN.load(find_model_to_load(args.model)) # MaskedDQN can also load models trained with plain DQN, and plays them with masking
     model.lookahead_depth = args.lookahead # 0 by default: greedy play, comparable with the learning curves
     print("Lookahead:", f"{args.lookahead} move(s)" if args.lookahead else "off")
     print(f"Seeds: {args.seed_offset}-{args.seed_offset + args.games - 1}")
-    scores, largest_tiles = play_games(model, number_of_games=args.games, first_seed=args.seed_offset)
+    scores, largest_tiles = play_games(model, number_of_games=args.games, first_seed=args.seed_offset, per_game=args.per_game)
     # calls the function and passes on the scores and largest_tiles lists
 
     # Benchmarking: mean, median, max, mean of the largest tiles, best tile.
@@ -61,6 +79,10 @@ def main():
     for tile in [64, 128, 256, 512, 1024, 2048, 4096, 8192]: # 4096 and 8192: reachable since lookahead_v1 with --lookahead 2
         percentage = np.mean(np.array(largest_tiles) >= tile) * 100
         print(f"Reached {tile}: {percentage:.1f}%")
+
+    # The games that failed the goal, to study or replay them (e.g. --seed-offset 1037 --games 1).
+    missed = [args.seed_offset + i for i, tile in enumerate(largest_tiles) if tile < 2048]
+    print("Seeds that missed 2048:", missed if missed else "none")
 
 
 if __name__ == "__main__":
