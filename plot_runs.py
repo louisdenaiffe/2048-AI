@@ -63,11 +63,12 @@ def main():
     for ax, (column, title, value_format) in zip(axes, PANELS):
         ax.set_facecolor(SURFACE)
 
-        # Baselines first, so they sit behind the runs: thin dashed gray lines, labelled on the left.
+        # Baselines first, so they sit behind the runs: thin dashed gray lines, labelled on the right
+        # (every run starts low on the left, so labels there would collide with the lines).
         for name, values in BASELINES.items():
             ax.axhline(values[column], color=MUTED, linewidth=1, linestyle=(0, (4, 4)), zorder=1)
-            ax.annotate(name, xy=(0, values[column]), xycoords=("axes fraction", "data"), xytext=(4, 3),
-                        textcoords="offset points", fontsize=8, color=MUTED, va="bottom")
+            ax.annotate(name, xy=(1, values[column]), xycoords=("axes fraction", "data"), xytext=(-4, 3),
+                        textcoords="offset points", fontsize=8, color=MUTED, va="bottom", ha="right")
 
         # One line per run, with a dot at each evaluation.
         for (name, data), color in zip(runs.items(), RUN_COLORS):
