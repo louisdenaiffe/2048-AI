@@ -8,6 +8,13 @@ The goal of this project is to train an AI to play 2048 using Deep Q-Learning (D
 **Result:** the final agent reaches the 2048 tile in **98% of games it has never seen**, and the 4096 tile in about half of them (mean score ~51,000).
 It combines a neural network trained with DQN and an expectimax search that uses that network to plan a few moves ahead.
 
+<p align="center">
+  <img src="figures/ai_playing.gif" alt="The agent playing a full game of 2048 and reaching the 4096 tile, with a final score of 80,352" width="370">
+  <br>
+  <em>The final agent (lookahead_v1, adaptive 2-to-4-move search) playing seed 0: it reaches 4096 with a score of 80,352.<br>
+  Most of the game is sped up; the last 40 moves are shown one by one.</em>
+</p>
+
 # Table of contents
  - [Results](#results)
  - [How the model works](#how-the-model-works)
@@ -132,6 +139,8 @@ Then training *with* a 1-move search (`lookahead_v1`) made the network better at
 - `evaluate.py`: plays 100 games and prints the results.
 - `watch_ai.py`: watch the model play live in the GUI.
 - `plot_runs.py`: draws the learning curves of several runs (`runs.png`).
+- `make_figures.py`: draws the summary charts in `figures/` from results already measured.
+- `make_gif.py`: records one game as an animated GIF.
 - `model_files.py`: where each model's files are saved (`models/<name>/`).
 
 
@@ -149,6 +158,9 @@ python evaluate.py --model lookahead_v1 --lookahead 4 --seed-offset 1000 --games
 
 # Watch it play
 python watch_ai.py --model lookahead_v1 --lookahead 4
+
+# Record one game as a GIF (figures/ai_playing.gif)
+python make_gif.py --model lookahead_v1 --lookahead 4 --seed 0
 
 # Learning curves
 python plot_runs.py empty_v2 lookahead_v1 --lookahead
